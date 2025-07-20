@@ -1,0 +1,39 @@
+# Compiled files
+*.o
+*.so
+*.la
+*.lo
+
+# Build directories
+build/
+.libs/
+
+# Autotools files
+Makefile.in
+aclocal.m4
+autom4te.cache/
+compile
+config.*
+configure
+depcomp
+install-sh
+libtool
+ltmain.sh
+missing
+stamp-h1
+
+# Package files
+*.tar.gz
+*.tar.xz
+*.tar.bz2
+pkg/
+src/
+
+# Editor files
+*.swp
+*~
+.vscode/
+.idea/
+
+# Generated desktop file
+xfce-launcher.desktop
