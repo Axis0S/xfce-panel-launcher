@@ -26,8 +26,11 @@ typedef struct {
     GtkWidget       *scrolled_window;
     GList           *app_list;
     GList           *filtered_list;
+    GList           *folder_list;     /* List of FolderInfo* */
     gint            current_page;
     gint            total_pages;
+    gboolean        drag_mode;        /* Track if in drag mode */
+    struct AppInfo  *drag_source;     /* App being dragged */
 } LauncherPlugin;
 
 /* Application info structure */
@@ -35,8 +38,19 @@ typedef struct {
     gchar *name;
     gchar *exec;
     gchar *icon;
-    GDesktopAppInfo *app_info;
+    GDesktopAppInfo *desktop_info;
+    gboolean is_hidden;  /* Track if app is hidden */
+    gchar *folder_id;    /* ID of folder containing this app, NULL if not in folder */
 } AppInfo;
+
+/* Folder structure */
+typedef struct {
+    gchar *id;           /* Unique folder ID */
+    gchar *name;         /* Folder display name */
+    gchar *icon;         /* Folder icon name */
+    GList *apps;         /* List of AppInfo* in this folder */
+    gboolean is_open;    /* Track if folder is open in UI */
+} FolderInfo;
 
 /* Function prototypes */
 static void launcher_construct(XfcePanelPlugin *plugin);
@@ -47,16 +61,31 @@ static void launcher_button_clicked(GtkWidget *button, LauncherPlugin *launcher)
 static void create_overlay_window(LauncherPlugin *launcher);
 static void hide_overlay(LauncherPlugin *launcher);
 static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, LauncherPlugin *launcher);
-static gboolean on_right_left_key(GtkWidget *widget, GdkEventKey *event, LauncherPlugin *launcher);
+static void on_swipe_gesture(GtkGestureSwipe *gesture, gdouble velocity_x, gdouble velocity_y, LauncherPlugin *launcher);
 static void on_search_changed(GtkSearchEntry *entry, LauncherPlugin *launcher);
 static void launch_application(GtkWidget *button, AppInfo *app_info);
 static void free_app_info(AppInfo *app_info);
+static void free_folder_info(FolderInfo *folder_info);
 static GList* load_applications(void);
 static gint compare_app_names(gconstpointer a, gconstpointer b);
 static void update_page_dots(LauncherPlugin *launcher);
 static void on_dot_clicked(GtkWidget *dot, gpointer data);
 static void populate_current_page(LauncherPlugin *launcher);
 static gboolean on_scroll_event(GtkWidget *widget, GdkEventScroll *event, LauncherPlugin *launcher);
+static void on_drag_data_received(GtkWidget *widget, GdkDragContext *context, gint x, gint y,
+                                  GtkSelectionData *data, guint info, guint time, LauncherPlugin *launcher);
+static void on_drag_data_get(GtkWidget *widget, GdkDragContext *context, GtkSelectionData *data,
+                             guint info, guint time, AppInfo *app_info);
+static gboolean on_button_press_event(GtkWidget *widget, GdkEventButton *event, AppInfo *app_info);
+static void hide_application(AppInfo *app_info, LauncherPlugin *launcher);
+static gboolean on_drag_drop(GtkWidget *widget, GdkDragContext *context, gint x, gint y, guint time, LauncherPlugin *launcher);
+static FolderInfo* create_folder(const gchar *name);
+static FolderInfo* find_folder_by_id(LauncherPlugin *launcher, const gchar *folder_id);
+static void add_app_to_folder(LauncherPlugin *launcher, AppInfo *app, const gchar *folder_id);
+static void remove_app_from_folder(LauncherPlugin *launcher, AppInfo *app);
+static gchar* get_config_file_path(void);
+static void save_configuration(LauncherPlugin *launcher);
+static void load_configuration(LauncherPlugin *launcher);
 
 /* Register the plugin */
 XFCE_PANEL_PLUGIN_REGISTER(launcher_construct);
@@ -72,29 +101,52 @@ static void launcher_construct(XfcePanelPlugin *plugin)
     
     /* Create the panel button */
     launcher->button = xfce_panel_create_button();
+    gtk_button_set_relief(GTK_BUTTON(launcher->button), GTK_RELIEF_NONE);
+    gtk_widget_set_name(launcher->button, "xfce-launcher-button");
     gtk_widget_show(launcher->button);
     
     /* Make panel button transparent */
     GtkCssProvider *button_provider = gtk_css_provider_new();
     gtk_css_provider_load_from_data(button_provider,
-        ".xfce4-panel button {\n"
+        "#xfce-launcher-button {\n"
         "  background: transparent;\n"
+        "  background-color: transparent;\n"
         "  background-image: none;\n"
         "  border: none;\n"
-        "  box-shadow: none;\n"
-        "  padding: 2px;\n"
+        "  outline: none;\n"
+        "  padding: 0px;\n"
+        "  margin: 0px;\n"
+        "  min-width: 16px;\n"
+        "  min-height: 16px;\n"
         "}\n"
-        ".xfce4-panel button:hover {\n"
-        "  background: rgba(255, 255, 255, 0.1);\n"
+        "#xfce-launcher-button:hover {\n"
+        "  background-color: rgba(255, 255, 255, 0.1);\n"
+        "  background-image: none;\n"
+        "}\n"
+        "#xfce-launcher-button:active {\n"
+        "  background-color: rgba(255, 255, 255, 0.2);\n"
+        "  background-image: none;\n"
+        "}\n"
+        ".xfce4-panel #xfce-launcher-button {\n"
+        "  background: transparent;\n"
+        "  background-color: transparent;\n"
         "}\n",
-        -1, NULL);
-    gtk_style_context_add_provider(gtk_widget_get_style_context(launcher->button),
+        -1,
+        NULL);
+    
+    GdkScreen *screen = gtk_widget_get_screen(launcher->button);
+    gtk_style_context_add_provider_for_screen(screen,
+                                             GTK_STYLE_PROVIDER(button_provider),
+                                             GTK_STYLE_PROVIDER_PRIORITY_APPLICATION + 1);
+    
+    GtkStyleContext *button_context = gtk_widget_get_style_context(launcher->button);
+    gtk_style_context_add_provider(button_context,
                                    GTK_STYLE_PROVIDER(button_provider),
-                                   GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
+                                   GTK_STYLE_PROVIDER_PRIORITY_APPLICATION + 1);
     g_object_unref(button_provider);
     
     /* Create icon */
-launcher-icon = gtk_image_new_from_icon_name("view-app-grid", GTK_ICON_SIZE_BUTTON);
+launcher->icon = gtk_image_new_from_icon_name("view-app-grid", GTK_ICON_SIZE_BUTTON);
     gtk_container_add(GTK_CONTAINER(launcher->button), launcher->icon);
     gtk_widget_show(launcher->icon);
     
@@ -117,6 +169,7 @@ launcher-icon = gtk_image_new_from_icon_name("view-app-grid", GTK_ICON_SIZE_BUT
     gtk_widget_show(launcher->button);
     
     /* Load applications */
+g_list_free_full(launcher->app_list, (GDestroyNotify)free_app_info);
     launcher->app_list = load_applications();
     launcher->filtered_list = g_list_copy(launcher->app_list);
     launcher->current_page = 0;
@@ -138,6 +191,11 @@ static void launcher_free(XfcePanelPlugin *plugin, LauncherPlugin *launcher)
     }
     if (launcher->filtered_list) {
         g_list_free(launcher->filtered_list);
+    }
+    
+    /* Free folder list */
+    if (launcher->folder_list) {
+        g_list_free_full(launcher->folder_list, (GDestroyNotify)free_folder_info);
     }
     
     /* Free the plugin structure */
@@ -203,47 +261,39 @@ static void create_overlay_window(LauncherPlugin *launcher)
     GtkCssProvider *provider = gtk_css_provider_new();
     gtk_css_provider_load_from_data(provider,
         "window {\n"
-        "  background: radial-gradient(ellipse at center, rgba(40, 40, 40, 0.85) 0%, rgba(20, 20, 20, 0.95) 100%);\n"
-        "  backdrop-filter: blur(50px);\n"
+        "  background-color: rgba(40, 40, 40, 0.85);\n"
         "}\n"
         "button.app-button {\n"
-        "  background: transparent;\n"
+        "  background-color: transparent;\n"
         "  background-image: none;\n"
         "  border: none;\n"
-        "  outline: none;\n"
-        "  box-shadow: none;\n"
         "  padding: 15px;\n"
         "  margin: 10px;\n"
         "  border-radius: 16px;\n"
-        "  transition: all 200ms cubic-bezier(0.25, 0.46, 0.45, 0.94);\n"
         "}\n"
         "button.app-button:hover {\n"
         "  background-color: rgba(255, 255, 255, 0.1);\n"
-        "  transform: scale(1.05);\n"
         "}\n"
         "button.app-button:active {\n"
-        "  transform: scale(0.98);\n"
+        "  background-color: rgba(255, 255, 255, 0.15);\n"
         "}\n"
         "button.app-button:focus {\n"
         "  outline: none;\n"
-        "  box-shadow: none;\n"
         "}\n"
         "button.app-button label {\n"
         "  color: rgba(255, 255, 255, 0.9);\n"
         "  font-size: 12px;\n"
         "  font-weight: 400;\n"
-        "  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);\n"
         "}\n"
         ".search-container {\n"
-        "  background: rgba(255, 255, 255, 0.15);\n"
+        "  background-color: rgba(255, 255, 255, 0.15);\n"
         "  border-radius: 12px;\n"
         "  border: 1px solid rgba(255, 255, 255, 0.2);\n"
-        "  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);\n"
         "  margin: 40px;\n"
-        "  backdrop-filter: blur(20px);\n"
         "}\n"
         "entry {\n"
-        "  background: transparent;\n"
+        "  background-color: transparent;\n"
+        "  background-image: none;\n"
         "  border: none;\n"
         "  font-size: 18px;\n"
         "  padding: 16px 20px;\n"
@@ -254,31 +304,50 @@ static void create_overlay_window(LauncherPlugin *launcher)
         "entry:focus {\n"
         "  outline: none;\n"
         "}\n"
-        "entry::placeholder {\n"
-        "  color: rgba(255, 255, 255, 0.5);\n"
+        "entry text {\n"
+        "  color: white;\n"
+        "}\n"
+        "entry text selection {\n"
+        "  background-color: rgba(255, 255, 255, 0.3);\n"
+        "  color: white;\n"
         "}\n"
         "box.page-dots {\n"
         "  padding: 30px;\n"
         "}\n"
         "button.page-dot {\n"
-        "  background: rgba(255, 255, 255, 0.3);\n"
+        "  background-color: rgba(255, 255, 255, 0.3);\n"
+        "  background-image: none;\n"
         "  border: none;\n"
         "  border-radius: 50%;\n"
         "  min-width: 8px;\n"
         "  min-height: 8px;\n"
-        "  max-width: 8px;\n"
-        "  max-height: 8px;\n"
-        "  margin: 0 5px;\n"
+        "  margin: 0px 5px;\n"
         "  padding: 4px;\n"
-        "  transition: all 200ms ease;\n"
         "}\n"
         "button.page-dot.active {\n"
-        "  background: rgba(255, 255, 255, 0.9);\n"
+        "  background-color: rgba(255, 255, 255, 0.9);\n"
         "}\n"
         "button.page-dot:hover {\n"
-        "  background: rgba(255, 255, 255, 0.5);\n"
+        "  background-color: rgba(255, 255, 255, 0.5);\n"
+        "}\n"
+        "button.folder {\n"
+        "  background-color: rgba(255, 255, 255, 0.08);\n"
+        "  background-image: none;\n"
+        "  border: none;\n"
+        "  padding: 15px;\n"
+        "  margin: 10px;\n"
+        "  border-radius: 16px;\n"
+        "}\n"
+        "button.folder:hover {\n"
+        "  background-color: rgba(255, 255, 255, 0.15);\n"
+        "}\n"
+        "button.folder label {\n"
+        "  color: rgba(255, 255, 255, 0.9);\n"
+        "  font-size: 12px;\n"
+        "  font-weight: 400;\n"
         "}\n",
-        -1, NULL);
+        -1,
+        NULL);
     
     GtkStyleContext *context = gtk_widget_get_style_context(launcher->overlay_window);
     gtk_style_context_add_provider(context,
@@ -335,12 +404,17 @@ static void create_overlay_window(LauncherPlugin *launcher)
     update_page_dots(launcher);
     
     /* Connect window key events for arrow navigation */
-    g_signal_connect(launcher-overlay_window, "key-press-event",
+    g_signal_connect(launcher->overlay_window, "key-press-event",
                      G_CALLBACK(on_key_press), launcher);
     
-    /* Connect scroll event */
+/* Connect scroll event */
     g_signal_connect(launcher->overlay_window, "scroll-event",
                      G_CALLBACK(on_scroll_event), launcher);
+
+    /* Connect drag and drop signals on grid */
+    gtk_drag_dest_set(launcher->app_grid, GTK_DEST_DEFAULT_ALL, NULL, 0, GDK_ACTION_MOVE);
+    g_signal_connect(launcher->app_grid, "drag-drop",
+                     G_CALLBACK(on_drag_drop), launcher);
     
     /* Add swipe gesture for touchpad */
     GtkGesture *swipe_gesture = gtk_gesture_swipe_new(launcher->overlay_window);
@@ -378,21 +452,21 @@ static void hide_overlay(LauncherPlugin *launcher)
 /* Handle key press events */
 static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, LauncherPlugin *launcher)
 {
-    switch (event-keyval) {
+    switch (event->keyval) {
         case GDK_KEY_Escape:
             hide_overlay(launcher);
             return TRUE;
         case GDK_KEY_Right:
-            if (launcher-current_page < launcher-total_pages - 1) {
-                launcher-current_page++;
+            if (launcher->current_page < launcher->total_pages - 1) {
+                launcher->current_page++;
                 populate_current_page(launcher);
                 update_page_dots(launcher);
                 return TRUE;
             }
             break;
         case GDK_KEY_Left:
-            if (launcher-current_page > 0) {
-                launcher-current_page--;
+            if (launcher->current_page > 0) {
+                launcher->current_page--;
                 populate_current_page(launcher);
                 update_page_dots(launcher);
                 return TRUE;
@@ -425,7 +499,7 @@ static void on_search_changed(GtkSearchEntry *entry, LauncherPlugin *launcher)
         
         for (iter = launcher->app_list; iter != NULL; iter = g_list_next(iter)) {
             AppInfo *app_info = (AppInfo *)iter->data;
-            if (app_info && app_info->name) {
+            if (app_info && app_info->name && !app_info->is_hidden) {
                 gchar *name_lower = g_utf8_strdown(app_info->name, -1);
                 if (strstr(name_lower, search_lower) != NULL) {
                     launcher->filtered_list = g_list_append(launcher->filtered_list, app_info);
@@ -450,8 +524,8 @@ static void launch_application(GtkWidget *button, AppInfo *app_info)
     GtkWidget *toplevel = gtk_widget_get_toplevel(button);
     LauncherPlugin *launcher = g_object_get_data(G_OBJECT(toplevel), "launcher");
     
-    if (app_info && app_info->app_info) {
-        g_app_info_launch(G_APP_INFO(app_info->app_info), NULL, NULL, &error);
+    if (app_info && app_info->desktop_info) {
+        g_app_info_launch(G_APP_INFO(app_info->desktop_info), NULL, NULL, &error);
         if (error) {
             g_warning("Failed to launch application: %s", error->message);
             g_error_free(error);
@@ -468,9 +542,25 @@ static void free_app_info(AppInfo *app_info)
         g_free(app_info->name);
         g_free(app_info->exec);
         g_free(app_info->icon);
-        if (app_info->app_info)
-            g_object_unref(app_info->app_info);
+        g_free(app_info->folder_id);
+        if (app_info->desktop_info)
+            g_object_unref(app_info->desktop_info);
         g_free(app_info);
+    }
+}
+
+/* Free FolderInfo structure */
+static void free_folder_info(FolderInfo *folder_info)
+{
+    if (folder_info) {
+        g_free(folder_info->id);
+        g_free(folder_info->name);
+        g_free(folder_info->icon);
+        /* Note: The apps list contains pointers to AppInfo structs
+         * that are owned by the main app_list, so we don't free them here */
+        if (folder_info->apps)
+            g_list_free(folder_info->apps);
+        g_free(folder_info);
     }
 }
 
@@ -496,7 +586,7 @@ static GList* load_applications(void)
                     app_info->icon = g_strdup(icon_names[0]);
             }
             
-            app_info->app_info = G_DESKTOP_APP_INFO(g_object_ref(gapp_info));
+            app_info->desktop_info = G_DESKTOP_APP_INFO(g_object_ref(gapp_info));
             
             app_list = g_list_prepend(app_list, app_info);
         }
@@ -570,15 +660,21 @@ static void populate_current_page(LauncherPlugin *launcher)
     gint apps_per_page = 30;
     gint start_index = launcher->current_page * apps_per_page;
     gint index = 0;
-    
+
     /* Clear existing children */
     gtk_container_foreach(GTK_CONTAINER(launcher->app_grid),
                          (GtkCallback)gtk_widget_destroy, NULL);
     
     /* Add applications to grid */
     for (iter = launcher->filtered_list; iter != NULL && index < start_index + apps_per_page; iter = g_list_next(iter)) {
+        AppInfo *app_info = (AppInfo *)iter->data;
+        
+        /* Skip hidden apps */
+        if (app_info->is_hidden) {
+            continue;
+        }
+        
         if (index >= start_index) {
-            AppInfo *app_info = (AppInfo *)iter->data;
             GtkWidget *button, *box, *icon, *label;
             
             /* Calculate grid position */
@@ -598,7 +694,7 @@ static void populate_current_page(LauncherPlugin *launcher)
             
             /* Create icon */
             if (app_info->icon) {
-icon = gtk_image_new_from_icon_name(launcher-icon, GTK_ICON_SIZE_DIALOG);
+icon = gtk_image_new_from_icon_name(app_info->icon, GTK_ICON_SIZE_DIALOG);
                 gtk_image_set_pixel_size(GTK_IMAGE(icon), 64);
             } else {
                 icon = gtk_image_new_from_icon_name("application-x-executable", GTK_ICON_SIZE_DIALOG);
@@ -606,8 +702,13 @@ icon = gtk_image_new_from_icon_name(launcher-icon, GTK_ICON_SIZE_DIALOG);
             }
             gtk_box_pack_start(GTK_BOX(box), icon, FALSE, FALSE, 0);
             
-            /* Create label */
-            label = gtk_label_new(app_info->name);
+            /* Create label, ensure name is valid */
+            if (app_info->name) {
+                label = gtk_label_new(app_info->name);
+            } else {
+                g_warning("App name is NULL, skipping app");
+                continue;
+            }
             gtk_label_set_line_wrap(GTK_LABEL(label), TRUE);
             gtk_label_set_ellipsize(GTK_LABEL(label), PANGO_ELLIPSIZE_END);
             gtk_label_set_max_width_chars(GTK_LABEL(label), 15);
@@ -616,15 +717,26 @@ icon = gtk_image_new_from_icon_name(launcher-icon, GTK_ICON_SIZE_DIALOG);
             gtk_widget_set_margin_end(label, 5);
             gtk_box_pack_start(GTK_BOX(box), label, FALSE, FALSE, 0);
             
-            /* Connect click signal */
+            /* Add drag-and-drop capability */
+            gtk_drag_source_set(button, GDK_BUTTON1_MASK, NULL, 0, GDK_ACTION_MOVE);
+            gtk_drag_dest_set(button, GTK_DEST_DEFAULT_ALL, NULL, 0, GDK_ACTION_MOVE);
+            g_signal_connect(button, "drag-data-received",
+                            G_CALLBACK(on_drag_data_received), launcher);
+            g_signal_connect(button, "drag-data-get",
+                            G_CALLBACK(on_drag_data_get), app_info);
+
+            /* Connect click and right-click context menu signals */
+            g_signal_connect(button, "button-press-event",
+                            G_CALLBACK(on_button_press_event), app_info);
             g_signal_connect(button, "clicked",
                             G_CALLBACK(launch_application), app_info);
             
             /* Add to grid */
             gtk_grid_attach(GTK_GRID(launcher->app_grid), button, col, row, 1, 1);
             
-            /* Store app_info reference for search */
+            /* Store app_info and launcher reference */
             g_object_set_data(G_OBJECT(button), "app-info", app_info);
+            g_object_set_data(G_OBJECT(button), "launcher", launcher);
             
             gtk_widget_show_all(button);
         }
@@ -701,6 +813,84 @@ static gboolean on_scroll_event(GtkWidget *widget, GdkEventScroll *event, Launch
     return TRUE;
 }
 
+/* Handle drag-and-drop data received */
+static void on_drag_data_received(GtkWidget *widget, GdkDragContext *context, gint x, gint y,
+                                  GtkSelectionData *data, guint info, guint time, LauncherPlugin *launcher)
+{
+    AppInfo *app_info = g_object_get_data(G_OBJECT(widget), "app-info");
+    FolderInfo *folder_info = find_folder_by_id(launcher, (const gchar *)data);
+
+    if (app_info && folder_info) {
+        add_app_to_folder(launcher, app_info, folder_info->id);
+        populate_current_page(launcher);
+    }
+    gtk_drag_finish(context, TRUE, FALSE, time);
+}
+
+/* Handle drag-and-drop data get */
+static void on_drag_data_get(GtkWidget *widget, GdkDragContext *context, GtkSelectionData *data,
+                             guint info, guint time, AppInfo *app_info)
+{
+    if (app_info && app_info->folder_id) {
+        gtk_selection_data_set_text(data, app_info->folder_id, -1);
+    }
+}
+
+/* Helper structure to pass both app_info and launcher to hide callback */
+typedef struct {
+    AppInfo *app_info;
+    LauncherPlugin *launcher;
+} HideCallbackData;
+
+/* Callback wrapper for hide menu item */
+static void on_hide_menu_activate(GtkMenuItem *menuitem, gpointer user_data)
+{
+    HideCallbackData *data = (HideCallbackData *)user_data;
+    if (data && data->app_info && data->launcher) {
+        hide_application(data->app_info, data->launcher);
+    }
+    g_free(data);
+}
+
+/* Handle button press for context menu */
+static gboolean on_button_press_event(GtkWidget *widget, GdkEventButton *event, AppInfo *app_info)
+{
+    if (event->type == GDK_BUTTON_PRESS && event->button == 3) { // Right-click
+        GtkWidget *menu = gtk_menu_new();
+        GtkWidget *hide_item = gtk_menu_item_new_with_label("Hide");
+        LauncherPlugin *launcher = g_object_get_data(G_OBJECT(widget), "launcher");
+        
+        if (!launcher) {
+            g_warning("Launcher reference not found in button data");
+            return FALSE;
+        }
+        
+        /* Create callback data with both app_info and launcher */
+        HideCallbackData *callback_data = g_new(HideCallbackData, 1);
+        callback_data->app_info = app_info;
+        callback_data->launcher = launcher;
+        
+        g_signal_connect(hide_item, "activate",
+                         G_CALLBACK(on_hide_menu_activate), callback_data);
+        gtk_menu_shell_append(GTK_MENU_SHELL(menu), hide_item);
+        gtk_widget_show_all(menu);
+        gtk_menu_popup_at_pointer(GTK_MENU(menu), (GdkEvent *)event);
+
+        return TRUE;
+    }
+    return FALSE;
+}
+
+/* Hide application */
+static void hide_application(AppInfo *app_info, LauncherPlugin *launcher)
+{
+    app_info->is_hidden = TRUE;
+    /* Update UI immediately */
+    populate_current_page(launcher);
+    update_page_dots(launcher);
+    save_configuration(launcher); // Save the configuration to reflect hidden state
+}
+
 /* Handle swipe gestures for page navigation */
 static void on_swipe_gesture(GtkGestureSwipe *gesture, gdouble velocity_x, gdouble velocity_y, LauncherPlugin *launcher)
 {
@@ -731,4 +921,171 @@ static void on_dot_clicked(GtkWidget *dot, gpointer data)
         populate_current_page(launcher);
         update_page_dots(launcher);
     }
+}
+
+/* Handle drag drop event */
+static gboolean on_drag_drop(GtkWidget *widget, GdkDragContext *context, gint x, gint y, guint time, LauncherPlugin *launcher)
+{
+    /* This is called when something is dropped on the grid
+     * We'll use it to create folders when apps are dropped on each other */
+
+    AppInfo *target_app = NULL;
+    GValue value = G_VALUE_INIT;
+
+    /* Get the application at the drop location */
+    gtk_container_child_get_property(GTK_CONTAINER(launcher->app_grid),
+                                     gtk_grid_get_child_at(GTK_GRID(launcher->app_grid), x / 130, y / 130),
+                                     "app-info", &value);
+
+    if (G_VALUE_HOLDS_POINTER(&value)) {
+        target_app = g_value_get_pointer(&value);
+    }
+
+    if (target_app && launcher->drag_source && launcher->drag_source != target_app) {
+        FolderInfo *folder = create_folder("New Folder");
+        add_app_to_folder(launcher, (AppInfo *)launcher->drag_source, folder->id);
+        add_app_to_folder(launcher, (AppInfo *)target_app, folder->id);
+
+        launcher->folder_list = g_list_append(launcher->folder_list, folder);
+
+        populate_current_page(launcher);
+        update_page_dots(launcher);
+        save_configuration(launcher);
+        gtk_drag_finish(context, TRUE, FALSE, time);
+        return TRUE;
+    }
+
+    gtk_drag_finish(context, FALSE, FALSE, time);
+    return FALSE;
+}
+
+/* Create a new folder */
+static FolderInfo* create_folder(const gchar *name)
+{
+    FolderInfo *folder = g_new0(FolderInfo, 1);
+    folder->id = g_strdup_printf("folder_%ld", g_get_monotonic_time());
+    folder->name = g_strdup(name);
+    folder->icon = g_strdup("folder");
+    folder->apps = NULL;
+    folder->is_open = FALSE;
+    return folder;
+}
+
+/* Find folder by ID */
+static FolderInfo* find_folder_by_id(LauncherPlugin *launcher, const gchar *folder_id)
+{
+    GList *iter;
+    for (iter = launcher->folder_list; iter != NULL; iter = g_list_next(iter)) {
+        FolderInfo *folder = (FolderInfo *)iter->data;
+        if (g_strcmp0(folder->id, folder_id) == 0) {
+            return folder;
+        }
+    }
+    return NULL;
+}
+
+/* Add app to folder */
+static void add_app_to_folder(LauncherPlugin *launcher, AppInfo *app, const gchar *folder_id)
+{
+    FolderInfo *folder = find_folder_by_id(launcher, folder_id);
+    if (folder && app) {
+        /* Remove from any existing folder */
+        if (app->folder_id) {
+            FolderInfo *old_folder = find_folder_by_id(launcher, app->folder_id);
+            if (old_folder) {
+                old_folder->apps = g_list_remove(old_folder->apps, app);
+            }
+            g_free(app->folder_id);
+        }
+        
+        /* Add to new folder */
+        app->folder_id = g_strdup(folder_id);
+        folder->apps = g_list_append(folder->apps, app);
+    }
+}
+
+/* Remove app from folder */
+static void remove_app_from_folder(LauncherPlugin *launcher, AppInfo *app)
+{
+    if (app && app->folder_id) {
+        FolderInfo *folder = find_folder_by_id(launcher, app->folder_id);
+        if (folder) {
+            folder->apps = g_list_remove(folder->apps, app);
+        }
+        g_free(app->folder_id);
+        app->folder_id = NULL;
+    }
+}
+
+/* Get config file path */
+static gchar* get_config_file_path(void)
+{
+    return g_build_filename(g_get_user_config_dir(), "xfce4", "launcher", "config.xml", NULL);
+}
+
+/* Save configuration */
+static void save_configuration(LauncherPlugin *launcher)
+{
+    gchar *config_path = get_config_file_path();
+    gchar *config_dir = g_path_get_dirname(config_path);
+    GString *xml;
+    GList *iter;
+    
+    /* Create config directory if it doesn't exist */
+    g_mkdir_with_parents(config_dir, 0700);
+    
+    /* Build XML content */
+    xml = g_string_new("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
+    g_string_append(xml, "<launcher-config>\n");
+    
+    /* Save folders */
+    g_string_append(xml, "  <folders>\n");
+    for (iter = launcher->folder_list; iter != NULL; iter = g_list_next(iter)) {
+        FolderInfo *folder = (FolderInfo *)iter->data;
+        g_string_append_printf(xml, "    <folder id=\"%s\" name=\"%s\" icon=\"%s\"/>\n",
+                              folder->id, folder->name, folder->icon);
+    }
+    g_string_append(xml, "  </folders>\n");
+    
+    /* Save app states */
+    g_string_append(xml, "  <apps>\n");
+    for (iter = launcher->app_list; iter != NULL; iter = g_list_next(iter)) {
+        AppInfo *app = (AppInfo *)iter->data;
+        if (app->is_hidden || app->folder_id) {
+            g_string_append_printf(xml, "    <app name=\"%s\" hidden=\"%s\"",
+                                  app->name, app->is_hidden ? "true" : "false");
+            if (app->folder_id) {
+                g_string_append_printf(xml, " folder=\"%s\"", app->folder_id);
+            }
+            g_string_append(xml, "/>\n");
+        }
+    }
+    g_string_append(xml, "  </apps>\n");
+    g_string_append(xml, "</launcher-config>\n");
+    
+    /* Write to file */
+    g_file_set_contents(config_path, xml->str, xml->len, NULL);
+    
+    g_string_free(xml, TRUE);
+    g_free(config_dir);
+    g_free(config_path);
+}
+
+/* Load configuration */
+static void load_configuration(LauncherPlugin *launcher)
+{
+    gchar *config_path = get_config_file_path();
+    gchar *contents = NULL;
+    gsize length;
+    
+    if (g_file_test(config_path, G_FILE_TEST_EXISTS) &&
+        g_file_get_contents(config_path, &contents, &length, NULL)) {
+        
+        /* Simple XML parsing (for now, we'll implement a basic parser) */
+        /* TODO: Implement proper XML parsing using GMarkup or similar */
+        
+        g_free(contents);
+    }
+    
+    g_free(config_path);
 }

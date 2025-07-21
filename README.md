@@ -2,12 +2,18 @@
 
 A full-screen application launcher plugin for XFCE Panel, similar to macOS Launchpad.
 
+## Version
+
+0.4
+
 ## Features
 
 - Full-screen overlay with semi-transparent background
 - Grid layout showing all installed applications
 - Search functionality to filter applications
 - Smooth hover effects on application icons
+- **Hide Applications**: Right-click any application and select "Hide" to remove it from view
+- **Dynamic Updates**: Automatically detects newly installed or removed applications
 - Press ESC to close the launcher
 - Click any application to launch it
 
