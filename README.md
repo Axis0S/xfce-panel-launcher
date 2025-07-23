@@ -1,3 +1,5 @@
+Enjoying the project? If you'd like to support its future development, you can do so via [![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/axisos) or [![Donate with PayPal](https://raw.githubusercontent.com/stefan-niedermann/paypal-donate-button/master/paypal-donate-button.png)](https://paypal.me/AxisOS) Any support is greatly appreciated!
+
 # XFCE Launcher Plugin
 
 A modern, full-screen application launcher plugin for XFCE Panel, inspired by macOS Launchpad. This plugin provides a visually appealing and efficient way to access all your installed applications with a single click.
