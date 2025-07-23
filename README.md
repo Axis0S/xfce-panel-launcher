@@ -1,11 +1,8 @@
-<a href="https://ko-fi.com/axisos">
+Enjoying the project? If you'd like to support its future development, you can do so via <a href="https://ko-fi.com/axisos">
   <img src="https://ko-fi.com/img/githubbutton_sm.svg" alt="Support me on Ko-fi" height="35">
-</a>
-<a href="https://paypal.me/AxisOS">
+</a> or <a href="https://paypal.me/AxisOS">
   <img src="https://img.shields.io/badge/PayPal-00457C?style=for-the-badge&logo=paypal&logoColor=white" alt="Donate with PayPal" height="35">
-</a>
-
-Enjoying the project? If you'd like to support its future development, you can do so via [![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/axisos) or [![Donate with PayPal](https://raw.githubusercontent.com/stefan-niedermann/paypal-donate-button/master/paypal-donate-button.png)](https://paypal.me/AxisOS) Any support is greatly appreciated!
+</a> Any support is greatly appreciated!
 
 # XFCE Launcher Plugin
 
