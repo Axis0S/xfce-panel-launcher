@@ -20,6 +20,7 @@
 #include <libxfce4util/libxfce4util.h>
 #include <libxfce4panel/libxfce4panel.h>
 #include <gio/gdesktopappinfo.h>
+#include <xfconf/xfconf.h>
 
 /* Forward declarations */
 typedef struct _LauncherPlugin LauncherPlugin;
@@ -62,6 +63,7 @@ struct _LauncherPlugin {
     gint            total_pages;
     gboolean        drag_mode;
     AppInfo         *drag_source;
+    XfconfChannel   *channel;
 };
 
 /* Helper structure for callbacks */
@@ -79,6 +81,8 @@ typedef struct {
 
 /* Application management functions */
 GList* load_applications(void);
+GList* load_applications_enhanced(void);
+void setup_application_monitoring(LauncherPlugin *launcher);
 void free_app_info(AppInfo *app_info);
 gint compare_app_names(gconstpointer a, gconstpointer b);
 void launch_application(GtkWidget *button, AppInfo *app_info);

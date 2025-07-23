@@ -6,6 +6,7 @@ Build-Depends: debhelper-compat (= 13),
                libgtk-3-dev,
                libxfce4panel-2.0-dev,
                libxfce4util-dev,
+               libxfconf-0-dev,
                libglib2.0-dev,
                pkg-config,
                xfce4-dev-tools
@@ -29,4 +30,7 @@ Description: Full-screen application launcher plugin for XFCE Panel
   - Smooth hover effects on application icons
   - Hide applications feature
   - Dynamic application detection
+  - Customizable panel icon
+  - Support for Snap and Flatpak applications
+  - Automatic refresh when apps are installed/uninstalled
   - ESC key to close launcher

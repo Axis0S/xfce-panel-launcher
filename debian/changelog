@@ -1,3 +1,21 @@
+xfce4-panel-launcher (0.6) unstable; urgency=medium
+
+  * Added customizable panel icon feature with settings dialog
+  * Implemented enhanced icon chooser with larger preview (48x48)
+  * Added file browser support for custom icons (SVG, PNG, JPEG)
+  * Added support for Snap and Flatpak applications
+  * Implemented automatic application refresh (no logout required)
+  * Added real-time monitoring of application directories
+  * Enhanced application discovery from multiple sources
+  * Added dependency on libxfconf for settings management
+  * Improved duplicate application detection
+  * Fixed icon display for both theme icons and file paths
+  * Enhanced settings dialog with better layout and spacing
+  * Added browse button for easy icon file selection
+  * Updated documentation with new features
+
+ -- Kamil 'Novik' Nowicki <novik@axisos.org>  Wed, 23 Jul 2025 17:26:00 +0000
+
 xfce4-panel-launcher (0.5) unstable; urgency=medium
 
   * Updated author information and copyright notices

@@ -2,8 +2,8 @@
 # Use this if you don't want to use autotools
 
 CC = gcc
-CFLAGS = -Wall -g -fPIC `pkg-config --cflags gtk+-3.0 libxfce4panel-2.0 libxfce4util-1.0 gio-2.0`
-LDFLAGS = -shared `pkg-config --libs gtk+-3.0 libxfce4panel-2.0 libxfce4util-1.0 gio-2.0`
+CFLAGS = -Wall -g -fPIC `pkg-config --cflags gtk+-3.0 libxfce4panel-2.0 libxfce4util-1.0 gio-2.0 libxfconf-0`
+LDFLAGS = -shared `pkg-config --libs gtk+-3.0 libxfce4panel-2.0 libxfce4util-1.0 gio-2.0 libxfconf-0`
 
 # Allow PREFIX override for packaging
 PREFIX ?= /usr
@@ -27,10 +27,10 @@ USER_LIB_DIR = $(HOME)/.local/lib/xfce4/panel/plugins
 USER_ICON_DIR = $(HOME)/.local/share/icons/hicolor
 
 # Source files
-SOURCES = src/plugin.c src/application.c src/ui.c src/events.c src/folders.c src/config.c
+SOURCES = src/plugin.c src/application.c src/application-loader.c src/ui.c src/events.c src/folders.c src/config.c src/settings.c
 OBJECTS = $(SOURCES:.c=.o)
 
-all: libxfce-launcher.so
+all: libxfce-launcher.so xfce-launcher.desktop
 
 %.o: %.c
 	$(CC) $(CFLAGS) -c -o $@ $<

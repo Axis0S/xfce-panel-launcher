@@ -18,10 +18,12 @@
 #endif
 
 #include "xfce-launcher.h"
+#include "settings.h"
 
 /* Forward declarations for internal functions */
 static void launcher_construct(XfcePanelPlugin *plugin);
 static void launcher_free(XfcePanelPlugin *plugin, LauncherPlugin *launcher);
+static void launcher_configure_plugin(XfcePanelPlugin *plugin, LauncherPlugin *launcher);
 
 /* Register the plugin */
 XFCE_PANEL_PLUGIN_REGISTER(launcher_construct);
@@ -85,6 +87,9 @@ static void launcher_construct(XfcePanelPlugin *plugin) {
     gtk_container_add(GTK_CONTAINER(launcher->button), launcher->icon);
     gtk_widget_show(launcher->icon);
     
+    /* Initialize settings */
+    launcher_settings_init(launcher);
+    
     /* Connect button click signal */
     g_signal_connect(G_OBJECT(launcher->button), "clicked",
                      G_CALLBACK(launcher_button_clicked), launcher);
@@ -99,15 +104,23 @@ static void launcher_construct(XfcePanelPlugin *plugin) {
                      G_CALLBACK(launcher_size_changed), launcher);
     g_signal_connect(G_OBJECT(plugin), "orientation-changed",
                      G_CALLBACK(launcher_orientation_changed), launcher);
+    g_signal_connect(G_OBJECT(plugin), "configure-plugin",
+                     G_CALLBACK(launcher_configure_plugin), launcher);
     
     /* Show the panel button */
     gtk_widget_show(launcher->button);
     
+    /* Enable context menu for properties */
+    xfce_panel_plugin_menu_show_configure(plugin);
+    
     /* Load applications */
     g_list_free_full(launcher->app_list, (GDestroyNotify)free_app_info);
-    launcher->app_list = load_applications();
+    launcher->app_list = load_applications_enhanced();
     launcher->filtered_list = g_list_copy(launcher->app_list);
     launcher->current_page = 0;
+    
+    /* Setup application monitoring for automatic refresh */
+    setup_application_monitoring(launcher);
     
     /* Create overlay window (hidden initially) */
     create_overlay_window(launcher);
@@ -146,6 +159,9 @@ static void launcher_free(XfcePanelPlugin *plugin, LauncherPlugin *launcher) {
         g_list_free_full(launcher->folder_list, (GDestroyNotify)free_folder_info);
     }
     
+    /* Free settings resources */
+    launcher_settings_free(launcher);
+    
     /* Free the plugin structure */
     g_slice_free(LauncherPlugin, launcher);
 }
@@ -164,6 +180,11 @@ gboolean launcher_size_changed(XfcePanelPlugin *plugin,
     /* Update icon size */
     gtk_image_set_pixel_size(GTK_IMAGE(launcher->icon), size - 4);
     return TRUE;
+}
+
+/* Handle configure request */
+static void launcher_configure_plugin(XfcePanelPlugin *plugin, LauncherPlugin *launcher) {
+    launcher_show_settings_dialog(launcher);
 }
 
 /* Handle button click */
