@@ -73,51 +73,20 @@ On Arch Linux, install them with:
 sudo pacman -S gtk3 xfce4-panel xfconf xfce4-dev-tools gcc make pkg-config
 ```
 
-## Building
-
-### Simple Build (Recommended)
-
-Use the simple Makefile:
-
-```bash
-make
-```
-
-### Using Autotools
-
-If you prefer to use the autotools build system:
-
-```bash
-mkdir m4
-xdt-autogen
-./configure --prefix=/usr
-make
-```
 
 ## Installation
 
-### System-wide Installation (Recommended)
 
 ```bash
-make
-sudo make install
+./install.sh
 ```
 
 This installs the plugin to the system directories:
 - Plugin library: `/usr/lib/x86_64-linux-gnu/xfce4/panel/plugins/` (on Debian/Ubuntu)
-- Plugin library: `/usr/lib/xfce4/panel/plugins/` (on other distributions)
+- Plugin library: `/usr/lib64/xfce4/panel/plugins/` (on Fedora/Redhat)
+- Plugin library: `/usr/lib/xfce4/panel/plugins/` (on Arch and other Distribution)
 - Desktop file: `/usr/share/xfce4/panel/plugins/`
 
-### Local User Installation
-
-For testing without sudo privileges:
-
-```bash
-make
-make install-local
-```
-
-This installs to your user directory (`~/.local/lib/xfce4/panel/plugins/`).
 
 ## Usage
 
@@ -140,13 +109,9 @@ This installs to your user directory (`~/.local/lib/xfce4/panel/plugins/`).
 
 For system-wide installation:
 ```bash
-sudo make uninstall
+./uninstall.sh
 ```
 
-For local user installation:
-```bash
-make uninstall-local
-```
 
 ## Customization
 
@@ -181,12 +146,12 @@ If the plugin doesn't appear after installation:
    - System installation (Debian/Ubuntu):
      - Plugin library: `/usr/lib/x86_64-linux-gnu/xfce4/panel/plugins/libxfce-launcher.so`
      - Desktop file: `/usr/share/xfce4/panel/plugins/xfce-launcher.desktop`
-   - System installation (other distributions):
+   - System installation (Fedora/RedHat):
+     - Plugin library: `/usr/lib64/xfce4/panel/plugins/libxfce-launcher.so`
+     - Desktop file: `/usr/share/xfce4/panel/plugins/xfce-launcher.desktop`
+   - System installation (Arch and other distributions):
      - Plugin library: `/usr/lib/xfce4/panel/plugins/libxfce-launcher.so`
      - Desktop file: `/usr/share/xfce4/panel/plugins/xfce-launcher.desktop`
-   - Local installation:
-     - Plugin library: `~/.local/lib/xfce4/panel/plugins/libxfce-launcher.so`
-     - Desktop file: `~/.local/share/xfce4/panel/plugins/xfce-launcher.desktop`
 3. Run XFCE Panel in debug mode to see any errors: `xfce4-panel -q && PANEL_DEBUG=1 xfce4-panel`
 
 ### Snap and Flatpak Applications
