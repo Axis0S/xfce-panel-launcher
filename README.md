@@ -1,3 +1,5 @@
+<script type='text/javascript' src='https://storage.ko-fi.com/cdn/widget/Widget_2.js'></script><script type='text/javascript'>kofiwidget2.init('Support me on Ko-fi', '#72a4f2', 'W7W61IGLD0');kofiwidget2.draw();</script> 
+
 # XFCE Launcher Plugin
 
 A modern, full-screen application launcher plugin for XFCE Panel, inspired by macOS Launchpad. This plugin provides a visually appealing and efficient way to access all your installed applications with a single click.
