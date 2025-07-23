@@ -26,10 +26,17 @@ USER_PLUGIN_DIR = $(HOME)/.local/share/xfce4/panel/plugins
 USER_LIB_DIR = $(HOME)/.local/lib/xfce4/panel/plugins
 USER_ICON_DIR = $(HOME)/.local/share/icons/hicolor
 
+# Source files
+SOURCES = src/plugin.c src/application.c src/ui.c src/events.c src/folders.c src/config.c
+OBJECTS = $(SOURCES:.c=.o)
+
 all: libxfce-launcher.so
 
-libxfce-launcher.so: src/xfce-launcher.c
-	$(CC) $(CFLAGS) -o $@ $< $(LDFLAGS)
+%.o: %.c
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+libxfce-launcher.so: $(OBJECTS)
+	$(CC) -o $@ $(OBJECTS) $(LDFLAGS)
 
 install: libxfce-launcher.so xfce-launcher.desktop
 	mkdir -p $(PLUGIN_DIR)
@@ -60,7 +67,7 @@ xfce-launcher.desktop: data/xfce-launcher.desktop.in
 	cp data/xfce-launcher.desktop.in xfce-launcher.desktop
 
 clean:
-	rm -f libxfce-launcher.so xfce-launcher.desktop
+	rm -f libxfce-launcher.so xfce-launcher.desktop $(OBJECTS)
 
 uninstall:
 	sudo rm -f $(LIB_DIR)/libxfce-launcher.so
