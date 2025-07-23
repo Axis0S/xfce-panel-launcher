@@ -1,0 +1,58 @@
+xfce4-panel-launcher for Debian
+-------------------------------
+
+The xfce4-panel-launcher package provides a modern, full-screen application 
+launcher plugin for the XFCE Panel, inspired by macOS Launchpad.
+
+What is XFCE Launcher Plugin?
+-----------------------------
+
+This plugin transforms the XFCE desktop experience by providing a visually 
+appealing and efficient way to access all installed applications. When 
+activated from the panel, it displays a full-screen overlay showing all 
+your applications in an organized grid layout.
+
+Key Features
+------------
+
+* Full-Screen Application Grid
+  - Displays all installed applications in a responsive grid layout
+  - Semi-transparent overlay that covers the entire screen
+  - Smooth animations and hover effects for visual feedback
+  - Automatic icon scaling for optimal display
+
+* Search and Navigation
+  - Real-time search filtering as you type
+  - Matches both application names and descriptions
+  - Keyboard shortcuts (ESC to close, Enter to launch)
+  - Single-click launching of applications
+
+* Application Management
+  - Right-click context menu for each application
+  - Hide unwanted applications from the launcher
+  - Automatic detection of newly installed/removed applications
+  - Respects .desktop file standards
+
+* System Integration
+  - Seamlessly integrates with XFCE Panel
+  - Uses system GTK and icon themes
+  - Lightweight with minimal resource usage
+  - Hardware-accelerated rendering via GTK3
+
+Usage
+-----
+
+After installation, the plugin appears as "Application Launcher" in the 
+XFCE Panel's "Add New Items" dialog. Once added to the panel, clicking 
+the launcher icon opens the full-screen application grid. Users can:
+
+- Browse applications visually in the grid
+- Start typing to search for specific applications
+- Right-click applications to access additional options
+- Press ESC at any time to close the launcher
+
+The plugin is designed to be intuitive and requires no configuration to 
+start using. It automatically discovers all installed applications from 
+standard system locations.
+
+ -- Kamil 'Novik' Nowicki <novik@axisos.org>  Wed, 23 Jul 2025 14:30:00 +0000

@@ -1,0 +1,19 @@
+xfce4-panel-launcher (0.5) unstable; urgency=medium
+
+  * Updated author information and copyright notices
+  * Added Debian packaging support
+  * Fixed minor issues and improved stability
+  * Added custom icon support with multiple sizes
+  * Updated documentation with comprehensive feature list
+
+ -- Kamil 'Novik' Nowicki <novik@axisos.org>  Wed, 23 Jul 2025 15:15:00 +0000
+
+xfce4-panel-launcher (0.4) unstable; urgency=medium
+
+  * Initial release
+  * Full-screen application launcher plugin for XFCE Panel
+  * Features grid layout with search functionality
+  * Support for hiding applications
+  * Dynamic application detection
+
+ -- Kamil 'Novik' Nowicki <novik@axisos.org>  Wed, 23 Jul 2025 14:30:00 +0000

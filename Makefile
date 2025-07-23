@@ -5,47 +5,78 @@ CC = gcc
 CFLAGS = -Wall -g -fPIC `pkg-config --cflags gtk+-3.0 libxfce4panel-2.0 libxfce4util-1.0 gio-2.0`
 LDFLAGS = -shared `pkg-config --libs gtk+-3.0 libxfce4panel-2.0 libxfce4util-1.0 gio-2.0`
 
+# Allow PREFIX override for packaging
+PREFIX ?= /usr
+DESTDIR ?=
+
+# Detect multiarch if available
+DEB_HOST_MULTIARCH ?= $(shell dpkg-architecture -qDEB_HOST_MULTIARCH 2>/dev/null)
+
 # System directories
-PLUGIN_DIR = /usr/share/xfce4/panel/plugins
-LIB_DIR = /usr/lib/xfce4/panel/plugins
+PLUGIN_DIR = $(DESTDIR)$(PREFIX)/share/xfce4/panel/plugins
+ICON_DIR = $(DESTDIR)$(PREFIX)/share/icons/hicolor
+ifdef DEB_HOST_MULTIARCH
+LIB_DIR = $(DESTDIR)$(PREFIX)/lib/$(DEB_HOST_MULTIARCH)/xfce4/panel/plugins
+else
+LIB_DIR = $(DESTDIR)$(PREFIX)/lib/xfce4/panel/plugins
+endif
 
 # User directories (for local install)
 USER_PLUGIN_DIR = $(HOME)/.local/share/xfce4/panel/plugins
 USER_LIB_DIR = $(HOME)/.local/lib/xfce4/panel/plugins
+USER_ICON_DIR = $(HOME)/.local/share/icons/hicolor
 
-all: libxfcelauncher.so
+all: libxfce-launcher.so
 
-libxfcelauncher.so: xfce-launcher.c
+libxfce-launcher.so: src/xfce-launcher.c
 	$(CC) $(CFLAGS) -o $@ $< $(LDFLAGS)
 
-install: libxfcelauncher.so xfce-launcher.desktop
-	sudo mkdir -p $(PLUGIN_DIR)
-	sudo mkdir -p $(LIB_DIR)
-	sudo cp libxfcelauncher.so $(LIB_DIR)/
-	sudo cp xfce-launcher.desktop $(PLUGIN_DIR)/
+install: libxfce-launcher.so xfce-launcher.desktop
+	mkdir -p $(PLUGIN_DIR)
+	mkdir -p $(LIB_DIR)
+	mkdir -p $(ICON_DIR)/16x16/apps
+	mkdir -p $(ICON_DIR)/22x22/apps
+	mkdir -p $(ICON_DIR)/24x24/apps
+	cp libxfce-launcher.so $(LIB_DIR)/
+	cp xfce-launcher.desktop $(PLUGIN_DIR)/
+	cp data/icons/16x16/xfce-launcher.svg $(ICON_DIR)/16x16/apps/
+	cp data/icons/22x22/xfce-launcher.svg $(ICON_DIR)/22x22/apps/
+	cp data/icons/24x24/xfce-launcher.svg $(ICON_DIR)/24x24/apps/
 
 # Local user installation (no sudo required)
-install-local: libxfcelauncher.so xfce-launcher.desktop
+install-local: libxfce-launcher.so xfce-launcher.desktop
 	mkdir -p $(USER_PLUGIN_DIR)
 	mkdir -p $(USER_LIB_DIR)
-	cp libxfcelauncher.so $(USER_LIB_DIR)/
+	mkdir -p $(USER_ICON_DIR)/16x16/apps
+	mkdir -p $(USER_ICON_DIR)/22x22/apps
+	mkdir -p $(USER_ICON_DIR)/24x24/apps
+	cp libxfce-launcher.so $(USER_LIB_DIR)/
 	cp xfce-launcher.desktop $(USER_PLUGIN_DIR)/
+	cp data/icons/16x16/xfce-launcher.svg $(USER_ICON_DIR)/16x16/apps/
+	cp data/icons/22x22/xfce-launcher.svg $(USER_ICON_DIR)/22x22/apps/
+	cp data/icons/24x24/xfce-launcher.svg $(USER_ICON_DIR)/24x24/apps/
 
-xfce-launcher.desktop: xfce-launcher.desktop.in
-	cp xfce-launcher.desktop.in xfce-launcher.desktop
+xfce-launcher.desktop: data/xfce-launcher.desktop.in
+	cp data/xfce-launcher.desktop.in xfce-launcher.desktop
 
 clean:
-	rm -f libxfcelauncher.so xfce-launcher.desktop
+	rm -f libxfce-launcher.so xfce-launcher.desktop
 
 uninstall:
 	sudo rm -f $(LIB_DIR)/libxfce-launcher.so
 	sudo rm -f $(LIB_DIR)/libxfcelauncher.so
 	sudo rm -f $(PLUGIN_DIR)/xfce-launcher.desktop
+	sudo rm -f $(ICON_DIR)/16x16/apps/xfce-launcher.svg
+	sudo rm -f $(ICON_DIR)/22x22/apps/xfce-launcher.svg
+	sudo rm -f $(ICON_DIR)/24x24/apps/xfce-launcher.svg
 
 # Uninstall from user directory
 uninstall-local:
 	rm -f $(USER_LIB_DIR)/libxfce-launcher.so
 	rm -f $(USER_LIB_DIR)/libxfcelauncher.so
 	rm -f $(USER_PLUGIN_DIR)/xfce-launcher.desktop
+	rm -f $(USER_ICON_DIR)/16x16/apps/xfce-launcher.svg
+	rm -f $(USER_ICON_DIR)/22x22/apps/xfce-launcher.svg
+	rm -f $(USER_ICON_DIR)/24x24/apps/xfce-launcher.svg
 
 .PHONY: all install install-local clean uninstall uninstall-local

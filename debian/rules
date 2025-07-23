@@ -1,0 +1,26 @@
+#!/usr/bin/make -f
+
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+export DEB_LDFLAGS_MAINT_APPEND = -Wl,--as-needed
+
+# Get the multiarch directory
+DEB_HOST_MULTIARCH ?= $(shell dpkg-architecture -qDEB_HOST_MULTIARCH)
+export DEB_HOST_MULTIARCH
+
+%:
+	dh $@
+
+override_dh_auto_configure:
+	# Using simple Makefile, no configure needed
+
+override_dh_auto_build:
+	$(MAKE) -C $(CURDIR)
+
+override_dh_auto_install:
+	$(MAKE) -C $(CURDIR) install DESTDIR=$(CURDIR)/debian/xfce4-panel-launcher PREFIX=/usr
+
+override_dh_auto_clean:
+	$(MAKE) -C $(CURDIR) clean
+
+override_dh_strip:
+	dh_strip --dbgsym-migration='xfce4-panel-launcher-dbg (<< 0.4-1~)'

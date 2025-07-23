@@ -3,6 +3,7 @@
 *.so
 *.la
 *.lo
+libxfce-launcher.so
 
 # Build directories
 build/
@@ -21,13 +22,25 @@ libtool
 ltmain.sh
 missing
 stamp-h1
+m4/
 
 # Package files
 *.tar.gz
 *.tar.xz
 *.tar.bz2
 pkg/
-src/
+
+# Debian build files
+debian/xfce4-panel-launcher/
+debian/.debhelper/
+debian/debhelper-build-stamp
+debian/files
+debian/*.log
+debian/*.substvars
+debian/*.debhelper
+
+# Build scripts (except install.sh and uninstall.sh)
+build-*.sh
 
 # Editor files
 *.swp

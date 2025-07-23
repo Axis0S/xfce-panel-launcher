@@ -1,0 +1,32 @@
+Source: xfce4-panel-launcher
+Section: xfce
+Priority: optional
+Maintainer: Kamil 'Novik' Nowicki <novik@axisos.org>
+Build-Depends: debhelper-compat (= 13),
+               libgtk-3-dev,
+               libxfce4panel-2.0-dev,
+               libxfce4util-dev,
+               libglib2.0-dev,
+               pkg-config,
+               xfce4-dev-tools
+Standards-Version: 4.6.0
+Homepage: https://github.com/Axis0S/xfce-panel-launcher
+Vcs-Browser: https://github.com/Axis0S/xfce-panel-launcher
+Vcs-Git: https://github.com/Axis0S/xfce-panel-launcher.git
+
+Package: xfce4-panel-launcher
+Architecture: any
+Depends: ${shlibs:Depends},
+         ${misc:Depends},
+         xfce4-panel (>= 4.16.0)
+Description: Full-screen application launcher plugin for XFCE Panel
+ A full-screen application launcher plugin for XFCE Panel, similar to
+ macOS Launchpad. Features include:
+ .
+  - Full-screen overlay with semi-transparent background
+  - Grid layout showing all installed applications
+  - Search functionality to filter applications
+  - Smooth hover effects on application icons
+  - Hide applications feature
+  - Dynamic application detection
+  - ESC key to close launcher
