@@ -2,7 +2,7 @@
 
 A modern, full-screen application launcher plugin for XFCE Panel, inspired by macOS Launchpad. This plugin provides a visually appealing and efficient way to access all your installed applications with a single click.
 
-![Screenshot](screenshot/launcher.png)
+![Screenshot](screenshots/launcher.png)
 
 ## Version
 
