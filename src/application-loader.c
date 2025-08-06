@@ -82,6 +82,7 @@ static void load_snap_applications(GList **app_list) {
                 }
                 
                 app_info->desktop_info = desktop_info;
+                app_info->position = -1;
                 *app_list = g_list_prepend(*app_list, app_info);
             }
             
@@ -140,6 +141,7 @@ static void load_flatpak_applications(GList **app_list) {
                     }
                     
                     app_info->desktop_info = desktop_info;
+                    app_info->position = -1;
                     *app_list = g_list_prepend(*app_list, app_info);
                 }
                 
@@ -176,6 +178,7 @@ static void load_flatpak_applications(GList **app_list) {
                         }
                         
                         app_info->desktop_info = desktop_info;
+                        app_info->position = -1;
                         *app_list = g_list_prepend(*app_list, app_info);
                     }
                     
@@ -212,6 +215,7 @@ GList* load_applications_enhanced(void) {
             }
             
             app_info->desktop_info = G_DESKTOP_APP_INFO(g_object_ref(gapp_info));
+            app_info->position = -1;
             
             app_list = g_list_prepend(app_list, app_info);
         }

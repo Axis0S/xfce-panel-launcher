@@ -86,3 +86,11 @@ gint compare_app_names(gconstpointer a, gconstpointer b) {
     return g_utf8_collate(app_a->name, app_b->name);
 }
 
+void recalculate_positions(LauncherPlugin *launcher) {
+    GList *iter;
+    gint i = 0;
+    for (iter = launcher->app_list; iter != NULL; iter = g_list_next(iter)) {
+        AppInfo *app = (AppInfo *)iter->data;
+        app->position = i++;
+    }
+}

@@ -48,6 +48,12 @@ void create_overlay_window(LauncherPlugin *launcher) {
     gtk_widget_set_hexpand(launcher->search_entry, TRUE);
     gtk_box_pack_start(GTK_BOX(search_box), launcher->search_entry, TRUE, TRUE, 0);
 
+    launcher->back_button = gtk_button_new_with_label("Back");
+    gtk_box_pack_start(GTK_BOX(search_box), launcher->back_button, FALSE, FALSE, 0);
+    g_signal_connect(launcher->back_button, "clicked", G_CALLBACK(on_back_button_clicked), launcher);
+    gtk_widget_set_no_show_all(launcher->back_button, TRUE);
+    gtk_widget_hide(launcher->back_button);
+
     g_signal_connect(launcher->search_entry, "search-changed",
                      G_CALLBACK(on_search_changed), launcher);
 
@@ -104,22 +110,54 @@ void populate_current_page(LauncherPlugin *launcher) {
     GList *iter;
     gint row, col;
     gint start_index = launcher->current_page * APPS_PER_PAGE;
-    gint index = 0;
+    gint grid_index = 0;
 
     gtk_container_foreach(GTK_CONTAINER(launcher->app_grid),
                          (GtkCallback)gtk_widget_destroy, NULL);
 
-    for (iter = launcher->filtered_list; iter != NULL && index < start_index + APPS_PER_PAGE; iter = g_list_next(iter)) {
+    /* Display folders */
+    for (iter = launcher->folder_list; iter != NULL; iter = g_list_next(iter)) {
+        FolderInfo *folder_info = (FolderInfo *)iter->data;
+
+        col = grid_index % GRID_COLUMNS;
+        row = grid_index / GRID_COLUMNS;
+
+        GtkWidget *button, *box, *icon, *label;
+        button = gtk_button_new();
+        gtk_style_context_add_class(gtk_widget_get_style_context(button), "folder");
+        gtk_button_set_relief(GTK_BUTTON(button), GTK_RELIEF_NONE);
+        gtk_widget_set_size_request(button, BUTTON_SIZE, BUTTON_SIZE);
+
+        box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 8);
+        gtk_container_add(GTK_CONTAINER(button), box);
+
+        icon = gtk_image_new_from_icon_name(folder_info->icon, GTK_ICON_SIZE_DIALOG);
+        gtk_image_set_pixel_size(GTK_IMAGE(icon), ICON_SIZE);
+        gtk_box_pack_start(GTK_BOX(box), icon, FALSE, FALSE, 0);
+
+        label = gtk_label_new(folder_info->name);
+        gtk_box_pack_start(GTK_BOX(box), label, FALSE, FALSE, 0);
+
+        g_signal_connect(button, "clicked", G_CALLBACK(on_folder_clicked), folder_info);
+        gtk_grid_attach(GTK_GRID(launcher->app_grid), button, col, row, 1, 1);
+        g_object_set_data(G_OBJECT(button), "folder-info", folder_info);
+        g_object_set_data(G_OBJECT(button), "launcher", launcher);
+        gtk_widget_show_all(button);
+        grid_index++;
+    }
+
+    /* Display applications */
+    GList *apps_to_display = launcher->open_folder ? launcher->open_folder->apps : launcher->filtered_list;
+    for (iter = apps_to_display; iter != NULL; iter = g_list_next(iter)) {
         AppInfo *app_info = (AppInfo *)iter->data;
 
-        if (app_info->is_hidden) {
+        if (launcher->open_folder == NULL && (app_info->is_hidden || app_info->folder_id)) {
             continue;
         }
 
-        if (index >= start_index) {
+        if (grid_index >= start_index && (launcher->open_folder != NULL || grid_index < start_index + APPS_PER_PAGE)) {
             GtkWidget *button, *box, *icon, *label;
 
-            gint grid_index = index - start_index;
             col = grid_index % GRID_COLUMNS;
             row = grid_index / GRID_COLUMNS;
 
@@ -158,6 +196,9 @@ void populate_current_page(LauncherPlugin *launcher) {
             g_signal_connect(button, "drag-data-get",
                             G_CALLBACK(on_drag_data_get), app_info);
 
+            g_signal_connect(button, "drag-begin",
+                            G_CALLBACK(on_drag_begin), launcher);
+
             g_signal_connect(button, "button-press-event",
                             G_CALLBACK(on_button_press_event), app_info);
 
@@ -171,7 +212,7 @@ void populate_current_page(LauncherPlugin *launcher) {
 
             gtk_widget_show_all(button);
         }
-        index++;
+        grid_index++;
     }
 }
 

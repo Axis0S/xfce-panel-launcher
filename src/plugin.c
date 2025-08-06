@@ -116,6 +116,10 @@ static void launcher_construct(XfcePanelPlugin *plugin) {
     /* Load applications */
     g_list_free_full(launcher->app_list, (GDestroyNotify)free_app_info);
     launcher->app_list = load_applications_enhanced();
+
+    /* Load configuration */
+    load_configuration(launcher);
+
     launcher->filtered_list = g_list_copy(launcher->app_list);
     launcher->current_page = 0;
     

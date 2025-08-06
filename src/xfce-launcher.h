@@ -35,6 +35,7 @@ struct _AppInfo {
     GDesktopAppInfo *desktop_info;
     gboolean is_hidden;
     gchar *folder_id;
+    gint position;
 };
 
 /* Folder structure */
@@ -59,6 +60,8 @@ struct _LauncherPlugin {
     GList           *app_list;
     GList           *filtered_list;
     GList           *folder_list;
+    FolderInfo      *open_folder;
+    GtkWidget       *back_button;
     gint            current_page;
     gint            total_pages;
     gboolean        drag_mode;
@@ -87,6 +90,7 @@ void free_app_info(AppInfo *app_info);
 gint compare_app_names(gconstpointer a, gconstpointer b);
 void launch_application(GtkWidget *button, AppInfo *app_info);
 void hide_application(AppInfo *app_info, LauncherPlugin *launcher);
+void recalculate_positions(LauncherPlugin *launcher);
 
 /* UI functions */
 void create_overlay_window(LauncherPlugin *launcher);
@@ -102,8 +106,11 @@ void on_dot_clicked(GtkWidget *dot, gpointer data);
 gboolean on_scroll_event(GtkWidget *widget, GdkEventScroll *event, LauncherPlugin *launcher);
 void on_swipe_gesture(GtkGestureSwipe *gesture, gdouble velocity_x, gdouble velocity_y, LauncherPlugin *launcher);
 gboolean on_button_press_event(GtkWidget *widget, GdkEventButton *event, AppInfo *app_info);
+void on_folder_clicked(GtkWidget *button, FolderInfo *folder_info);
+void on_back_button_clicked(GtkWidget *button, LauncherPlugin *launcher);
 
 /* Drag and drop handlers */
+void on_drag_begin(GtkWidget *widget, GdkDragContext *context, gpointer user_data);
 void on_drag_data_received(GtkWidget *widget, GdkDragContext *context, gint x, gint y,
                           GtkSelectionData *data, guint info, guint time, LauncherPlugin *launcher);
 void on_drag_data_get(GtkWidget *widget, GdkDragContext *context, GtkSelectionData *data,

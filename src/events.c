@@ -165,6 +165,29 @@ static void on_hide_menu_activate(GtkMenuItem *menuitem, gpointer user_data) {
     g_free(data);
 }
 
+void on_folder_clicked(GtkWidget *button, FolderInfo *folder_info) {
+    LauncherPlugin *launcher = g_object_get_data(G_OBJECT(button), "launcher");
+    if (launcher) {
+        launcher->open_folder = folder_info;
+        g_list_free(launcher->filtered_list);
+        launcher->filtered_list = g_list_copy(folder_info->apps);
+        launcher->current_page = 0;
+        populate_current_page(launcher);
+        update_page_dots(launcher);
+        gtk_widget_show(launcher->back_button);
+    }
+}
+
+void on_back_button_clicked(GtkWidget *button, LauncherPlugin *launcher) {
+    launcher->open_folder = NULL;
+    g_list_free(launcher->filtered_list);
+    launcher->filtered_list = g_list_copy(launcher->app_list);
+    launcher->current_page = 0;
+    populate_current_page(launcher);
+    update_page_dots(launcher);
+    gtk_widget_hide(launcher->back_button);
+}
+
 gboolean on_button_press_event(GtkWidget *widget, GdkEventButton *event, AppInfo *app_info) {
     if (event->type == GDK_BUTTON_PRESS && event->button == 3) {
         GtkWidget *menu = gtk_menu_new();
@@ -192,6 +215,14 @@ gboolean on_button_press_event(GtkWidget *widget, GdkEventButton *event, AppInfo
 }
 
 /* Drag and drop handlers */
+void on_drag_begin(GtkWidget *widget, GdkDragContext *context, gpointer user_data) {
+    LauncherPlugin *launcher = g_object_get_data(G_OBJECT(widget), "launcher");
+    AppInfo *app_info = g_object_get_data(G_OBJECT(widget), "app-info");
+    if (launcher && app_info) {
+        launcher->drag_source = app_info;
+    }
+}
+
 void on_drag_data_received(GtkWidget *widget, GdkDragContext *context, gint x, gint y,
                           GtkSelectionData *data, guint info, guint time, LauncherPlugin *launcher) {
     AppInfo *app_info = g_object_get_data(G_OBJECT(widget), "app-info");
@@ -212,24 +243,43 @@ void on_drag_data_get(GtkWidget *widget, GdkDragContext *context, GtkSelectionDa
 }
 
 gboolean on_drag_drop(GtkWidget *widget, GdkDragContext *context, gint x, gint y, guint time, LauncherPlugin *launcher) {
-    AppInfo *target_app = NULL;
-    GValue value = G_VALUE_INIT;
-
-    gtk_container_child_get_property(GTK_CONTAINER(launcher->app_grid),
-                                     gtk_grid_get_child_at(GTK_GRID(launcher->app_grid), x / BUTTON_SIZE, y / BUTTON_SIZE),
-                                     "app-info", &value);
-
-    if (G_VALUE_HOLDS_POINTER(&value)) {
-        target_app = g_value_get_pointer(&value);
+    if (!launcher->drag_source) {
+        gtk_drag_finish(context, FALSE, FALSE, time);
+        return FALSE;
     }
 
-    if (target_app && launcher->drag_source && launcher->drag_source != target_app) {
+    GtkWidget *target_widget = gtk_grid_get_child_at(GTK_GRID(launcher->app_grid), x / BUTTON_SIZE, y / BUTTON_SIZE);
+    AppInfo *target_app = target_widget ? g_object_get_data(G_OBJECT(target_widget), "app-info") : NULL;
+    FolderInfo *target_folder = target_widget ? g_object_get_data(G_OBJECT(target_widget), "folder-info") : NULL;
+
+    gboolean success = FALSE;
+
+    if (target_app && launcher->drag_source != target_app) {
+        /* Dropped on another app -> create a folder */
         FolderInfo *folder = create_folder("New Folder");
+        launcher->folder_list = g_list_append(launcher->folder_list, folder);
+
         add_app_to_folder(launcher, launcher->drag_source, folder->id);
         add_app_to_folder(launcher, target_app, folder->id);
 
-        launcher->folder_list = g_list_append(launcher->folder_list, folder);
+        success = TRUE;
+    } else if (target_folder) {
+        /* Dropped on a folder -> add to folder */
+        add_app_to_folder(launcher, launcher->drag_source, target_folder->id);
+        success = TRUE;
+    } else {
+        /* Dropped on empty space -> reorder */
+        gint page_offset = launcher->current_page * APPS_PER_PAGE;
+        gint new_index = (y / BUTTON_SIZE) * GRID_COLUMNS + (x / BUTTON_SIZE) + page_offset;
 
+        launcher->app_list = g_list_remove(launcher->app_list, launcher->drag_source);
+        launcher->app_list = g_list_insert(launcher->app_list, launcher->drag_source, new_index);
+
+        recalculate_positions(launcher);
+        success = TRUE;
+    }
+
+    if (success) {
         populate_current_page(launcher);
         update_page_dots(launcher);
         save_configuration(launcher);
@@ -237,6 +287,7 @@ gboolean on_drag_drop(GtkWidget *widget, GdkDragContext *context, gint x, gint y
         return TRUE;
     }
 
+    launcher->drag_source = NULL;
     gtk_drag_finish(context, FALSE, FALSE, time);
     return FALSE;
 }
